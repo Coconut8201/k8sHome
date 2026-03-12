@@ -1,0 +1,8 @@
+.claude
+
+task5/.terraform
+task5/.terraform.lock.hcl
+task5/linode-config.yaml
+task5/terraform.tfvars
+task5/terraform.tfstate
+task5/terraform.tfstate.backup

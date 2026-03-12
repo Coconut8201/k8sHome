@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: task4-role
+  namespace: task4
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: task4-rolebinding
+  namespace: task4
+subjects:
+  - kind: ServiceAccount
+    name: task4sa
+    namespace: task4
+roleRef:
+  kind: Role
+  name: task4-role
+  apiGroup: rbac.authorization.k8s.io

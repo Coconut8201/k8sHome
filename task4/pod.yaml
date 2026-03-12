@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: task4-pod
+  namespace: task4
+spec:
+  serviceAccountName: task4sa
+  containers:
+    - name: task4
+      image: coconut820/k8s-task4:latest
+  restartPolicy: Never

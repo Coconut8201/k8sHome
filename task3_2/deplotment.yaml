@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.14.2
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - touch
+                  - /tmp/ready
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            exec:
+              command:
+                - cat
+                - /tmp/ready
+            initialDelaySeconds: 5
+            periodSeconds: 5

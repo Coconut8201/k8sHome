@@ -18,13 +18,13 @@ provider "linode" {
 # ========== linode cluster =============
 resource "linode_lke_cluster" "linode-cluster" {
   label       = "linode-cluster"
-  k8s_version = "1.35"
-  region      = "ap-northeast"
+  k8s_version = var.k8s_version
+  region      = var.region
   tags        = ["test"]
 
   pool {
-    type  = "g6-standard-1" # 練習用最小就好
-    count = 1
+    type  = var.pool_type
+    count = var.pool_count
   }
 }
 
@@ -40,11 +40,24 @@ provider "kubectl" {
   cluster_ca_certificate = base64decode(local.kubeconfig.clusters[0].cluster["certificate-authority-data"])
 }
 
-data "kubectl_file_documents" "manifests" {
-  content = file("${path.module}/deployment.yaml")
+# ======== Deployment ========
+data "kubectl_file_documents" "deployment" {
+  content = templatefile("${path.module}/deployment.yaml", {
+    replicas_number = var.replicas_number
+  })
 }
 
 resource "kubectl_manifest" "deployment" {
-  for_each  = data.kubectl_file_documents.manifests.manifests
+  for_each  = data.kubectl_file_documents.deployment.manifests
+  yaml_body = each.value
+}
+
+# ======== Service ========
+data "kubectl_file_documents" "service" {
+  content = file("${path.module}/lb-svc.yaml")
+}
+
+resource "kubectl_manifest" "service" {
+  for_each  = data.kubectl_file_documents.service.manifests
   yaml_body = each.value
 }

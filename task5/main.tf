@@ -61,3 +61,16 @@ resource "kubectl_manifest" "service" {
   for_each  = data.kubectl_file_documents.service.manifests
   yaml_body = each.value
 }
+
+# # ======== VPC ========
+# resource "linode_vpc" "vpc" {
+#   label       = "linode-vpc"
+#   region      = var.region
+#   description = "VPC for linode project"
+# }
+
+# resource "linode_vpc_subnet" "sbt" {
+#   vpc_id = linode_vpc.vpc.id
+#   label  = "linode-sbt"
+#   ipv4   = var.subnet_cidr
+# }

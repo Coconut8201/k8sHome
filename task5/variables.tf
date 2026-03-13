@@ -12,7 +12,8 @@ variable "replicas_number" {
 variable "region" {
   description = "linode region"
   type        = string
-  default     = "ap-northeast"
+  # default = "jp-osa"
+  default = "us-ord"
 }
 
 variable "k8s_version" {

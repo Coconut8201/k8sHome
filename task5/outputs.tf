@@ -4,11 +4,11 @@ output "kubeconfig" {
   sensitive = true
 }
 
-# # ======== VPC setting ========
-# output "vpc_id" {
-#   value = linode_vpc.vpc.id
-# }
+# ======== VPC setting ========
+output "vpc_id" {
+  value = linode_vpc.vpc.id
+}
 
-# output "subnet_id" {
-#   value = linode_vpc_subnet.sbt.id
-# }
+output "subnet_id" {
+  value = linode_vpc_subnet.sbt.id
+}

@@ -53,8 +53,15 @@ cp terraform.tfvars.example terraform.tfvars
 
 ### 2. 建立資源
 
+由於 kubectl provider 依賴 LKE Cluster 已存在，需分兩步驟部署：
+
 ```bash
 terraform init
+
+# 第一步：先建立 LKE Cluster
+terraform apply -target=linode_lke_cluster.linode-cluster
+
+# 第二步：再部署 Kubernetes 資源
 terraform apply
 ```
 
@@ -85,10 +92,36 @@ Pod: task5-nginx-deployment-5cf9984c65-nkkpx
 Pod: task5-nginx-deployment-5cf9984c65-dssc4
 ```
 
-### 5. 清除資源
+### 5. 使用 k9s 管理 Cluster
+
+[k9s](https://k9scli.io/) 是一個 Terminal UI 工具，可方便地瀏覽和管理 Kubernetes 資源。
+
+```bash
+# 安裝 k9s（macOS）
+brew install k9s
+
+# 使用 linode kubeconfig 啟動 k9s
+k9s --kubeconfig=linode-config.yaml
+
+# 或設定環境變數後直接啟動
+export KUBECONFIG=$(pwd)/linode-config.yaml
+k9s
+```
+
+k9s 常用快捷鍵：
+
+| 按鍵 | 功能 |
+|---|---|
+| `:pod` | 切換至 Pod 列表 |
+| `:svc` | 切換至 Service 列表 |
+| `:deploy` | 切換至 Deployment 列表 |
+| `l` | 查看 Pod logs |
+| `d` | 描述資源（describe） |
+| `ctrl+d` | 刪除資源 |
+| `?` | 查看所有快捷鍵 |
+
+### 6. 清除資源
 
 ```bash
 terraform destroy
 ```
-
-> 若 Terraform state 遺失，需手動至 Linode Cloud Manager 刪除 **Kubernetes Cluster** 及 **NodeBalancer**。

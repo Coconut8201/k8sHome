@@ -2,7 +2,7 @@ terraform {
   required_providers {
     linode = {
       source  = "linode/linode"
-      version = "~> 2.0"
+      version = "~> 3.10"
     }
     kubectl = {
       source  = "gavinbunney/kubectl"
@@ -12,7 +12,21 @@ terraform {
 }
 
 provider "linode" {
-  token = var.linode_token
+  token       = var.linode_token
+  api_version = "v4beta"
+}
+
+# ======== VPC ========
+resource "linode_vpc" "vpc" {
+  label       = "linode-vpc"
+  region      = var.region
+  description = "VPC for linode project"
+}
+
+resource "linode_vpc_subnet" "sbt" {
+  vpc_id = linode_vpc.vpc.id
+  label  = "linode-sbt"
+  ipv4   = var.subnet_cidr
 }
 
 # ========== linode cluster =============
@@ -21,6 +35,9 @@ resource "linode_lke_cluster" "linode-cluster" {
   k8s_version = var.k8s_version
   region      = var.region
   tags        = ["test"]
+
+  subnet_id = linode_vpc_subnet.sbt.id
+  vpc_id    = linode_vpc.vpc.id
 
   pool {
     type  = var.pool_type
@@ -48,8 +65,9 @@ data "kubectl_file_documents" "deployment" {
 }
 
 resource "kubectl_manifest" "deployment" {
-  for_each  = data.kubectl_file_documents.deployment.manifests
-  yaml_body = each.value
+  for_each   = data.kubectl_file_documents.deployment.manifests
+  yaml_body  = each.value
+  depends_on = [linode_lke_cluster.linode-cluster]
 }
 
 # ======== Service ========
@@ -58,19 +76,7 @@ data "kubectl_file_documents" "service" {
 }
 
 resource "kubectl_manifest" "service" {
-  for_each  = data.kubectl_file_documents.service.manifests
-  yaml_body = each.value
+  for_each   = data.kubectl_file_documents.service.manifests
+  yaml_body  = each.value
+  depends_on = [linode_lke_cluster.linode-cluster]
 }
-
-# # ======== VPC ========
-# resource "linode_vpc" "vpc" {
-#   label       = "linode-vpc"
-#   region      = var.region
-#   description = "VPC for linode project"
-# }
-
-# resource "linode_vpc_subnet" "sbt" {
-#   vpc_id = linode_vpc.vpc.id
-#   label  = "linode-sbt"
-#   ipv4   = var.subnet_cidr
-# }

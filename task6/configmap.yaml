@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: configfile
+data:
+  default.conf: |
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://web-server;
+      }
+    }
+  redis.conf: |
+    requirepass password
+    user admin on >password ~* &* +@all
+    user default off

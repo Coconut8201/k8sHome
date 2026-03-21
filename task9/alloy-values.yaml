@@ -1,0 +1,69 @@
+controller:
+  type: daemonset
+  volumes:
+    extra:
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+
+alloy:
+  mounts:
+    extra:
+      - name: varlogpods
+        mountPath: /var/log/pods
+        readOnly: true
+      - name: varlibdockercontainers
+        mountPath: /var/lib/docker/containers
+        readOnly: true
+  configMap:
+    content: |
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      discovery.relabel "pod_logs" {
+        targets = discovery.kubernetes.pods.targets
+
+        # // 只保留有 service_name label 的 pod
+        # rule {
+        #   source_labels = ["__meta_kubernetes_pod_label_service_name"]
+        #   regex         = ".+"
+        #   action        = "keep"
+        # }
+
+        // 把 pod 的 service_name label 轉成 Loki label
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_service_name"]
+          target_label  = "service_name"
+        }
+
+        # // 加上 namespace label 方便查詢
+        # rule {
+        #   source_labels = ["__meta_kubernetes_namespace"]
+        #   target_label  = "namespace"
+        # }
+        #
+        # // 加上 pod label
+        # rule {
+        #   source_labels = ["__meta_kubernetes_pod_name"]
+        #   target_label  = "pod"
+        # }
+        #
+      }
+
+      loki.source.kubernetes "pod_logs" {
+        targets    = discovery.relabel.pod_logs.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki-gateway.default.svc.cluster.local/loki/api/v1/push"
+          headers = {
+            "X-Scope-OrgID" = "foo",
+          }
+        }
+      }

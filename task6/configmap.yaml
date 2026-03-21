@@ -7,7 +7,7 @@ data:
     server {
       listen 80;
       location / {
-        proxy_pass http://web-server;
+        proxy_pass http://go-server;
       }
     }
   redis.conf: |

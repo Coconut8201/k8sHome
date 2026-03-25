@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: go-server
-          image: go-server:latest
+          image: coconut820/go-server:latest
           imagePullPolicy: IfNotPresent # ← 本地 image 一定要加這個！
           ports:
             - containerPort: 8080

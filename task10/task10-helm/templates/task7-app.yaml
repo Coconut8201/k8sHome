@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: task7-crd
+  name: task7-app
   namespace: argocd
 spec:
   project: default
@@ -10,8 +10,8 @@ spec:
     targetRevision: 0.1.0
     path: .
   destination:
-    server: {{ .Value.destination.server }}
-    namespace: {{ .Value.destination.namespace }}
+    server: {{ .Values.destination.server }}
+    namespace: {{ .Values.destination.namespace }}
   syncPolicy:
     automated:
       prune: true

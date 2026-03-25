@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: task6-crd
+  name: task6-app
   namespace: argocd
 spec:
   project: default

@@ -8,3 +8,5 @@ task5/terraform.tfstate
 task5/terraform.tfstate.backup
 
 *.tgz
+
+assets/

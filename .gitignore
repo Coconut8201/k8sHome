@@ -10,3 +10,8 @@ task5/terraform.tfstate.backup
 *.tgz
 
 assets/
+
+# task11 sensitive credentials
+task11/access-key
+task11/secret-access-key
+task11/vault_token.md

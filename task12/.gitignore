@@ -1,0 +1,15 @@
+# Terraform 本地目錄與快取
+.terraform/
+.terraform.lock.hcl
+
+# State 檔（含敏感資訊）
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+
+# 變數檔（可能含機密）
+*.tfvars
+*.tfvars.json
+
+# 執行計畫
+*.tfplan

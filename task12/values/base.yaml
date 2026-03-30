@@ -1,0 +1,4 @@
+image:
+  tag: latest
+readinessProbe:
+  enabled: false

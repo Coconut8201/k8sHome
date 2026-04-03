@@ -15,3 +15,13 @@ assets/
 task11/access-key
 task11/secret-access-key
 task11/vault_token.md
+
+# task12 sensitive files
+task12/ssl/
+task12/terraform/.terraform/
+task12/terraform/*.tfstate
+task12/terraform/*.tfstate.backup
+task12/terraform/*.tfvars
+task12/terraform/*.tfvars.json
+task12/terraform/*.tfplan
+task12/terraform/.terraform.lock.hcl

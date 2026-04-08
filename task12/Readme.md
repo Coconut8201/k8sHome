@@ -22,30 +22,30 @@ task12/
 │   ├── values.yaml
 │   └── templates/
 │       ├── nginx.deploy.yaml    # Nginx Deployment（config 由 CSI 掛載）
-│       ├── go-server.yaml       # Go Web Server Deployment
-│       ├── go-server-svc.yaml   # Go Server Service
-│       ├── redis.yaml           # Redis StatefulSet（config 由 CSI 掛載）
-│       ├── redis-svc.yaml       # Redis Service
-│       ├── secrets.yaml         # （已註解，改用 ESO 同步）
+│       ├── go-server.yaml       # Go Web Server Deployment（3 replicas）
+│       ├── go-server-svc.yaml   # Go Server Service（port 80 → 8080）
+│       ├── redis.yaml           # Redis StatefulSet（2 replicas，config 由 CSI 掛載，資料由 PVC 持久化）
+│       ├── redis-svc.yaml       # Redis Headless Service
+│       ├── secrets.yaml         # （已全部註解，改用 ESO 同步）
 │       └── cr/
 │           ├── secretProviderClass.yaml   # CSI 對應 Vault 路徑
-│           ├── vault-secret-store.yaml    # ESO SecretStore（Vault 連線設定）
+│           ├── vault-secret-store.yaml    # ESO SecretStore + vault-root-auth Secret
 │           └── vault-external-secret.yaml # ESO ExternalSecret（同步 Redis 憑證）
 ├── src/                         # Go Web Server 原始碼
 │   ├── go-web.go                # 提供 /get API，讀取 Redis 中的 username/password
-│   ├── go.mod
+│   ├── go.mod                   # module: task6（注意：模組名稱沿用 task6）
 │   ├── go.sum
-│   └── dockerfile
+│   └── dockerfile               # 多階段建置：golang:1.26 → alpine
 └── terraform/                   # 基礎設施 IaC
     ├── main.tf                  # 模組串接入口
     ├── outputs.tf               # 輸出 GitLab/ArgoCD 初始密碼
     └── modules/
-        ├── gitlab/              # GitLab（含 socat port forward）
-        ├── argocd/              # ArgoCD（GitOps 控制器）
-        ├── secrets-store-csi-driver/  # CSI Driver
-        ├── vault-helm/          # Vault Server
-        ├── vault-csi-provider/  # Vault CSI Provider（橋接 CSI ↔ Vault）
-        └── eso/                 # External Secrets Operator
+        ├── gitlab/              # GitLab v9.10.1（含 socat port forward）
+        ├── argocd/              # ArgoCD v9.4.17（GitOps 控制器）
+        ├── secrets-store-csi-driver/  # CSI Driver v1.5.6
+        ├── vault-helm/          # Vault Server v0.32.0（dev 模式）
+        ├── vault-csi-provider/  # Vault CSI Provider（同 vault chart v0.32.0，僅啟用 CSI）
+        └── eso/                 # External Secrets Operator v2.2.0
 ```
 
 ---
@@ -69,6 +69,8 @@ Vault（Secret 後端）
             │   ExternalSecret → SecretStore → Vault         │
             └──────────────────────────────────────────────► Go Server Pod（envFrom）
                                                               │
+                                                              Redis Pod（envFrom）
+                                                              │
                                                               └─► Redis（讀取 username/password）
 ```
 
@@ -89,6 +91,19 @@ Minikube 需求資源：**4 CPU、12 GB RAM**
 
 ---
 
+## 部署元件版本
+
+| 元件 | Helm Chart 版本 | Namespace |
+|------|----------------|-----------|
+| GitLab | 9.10.1 | gitlab |
+| ArgoCD | 9.4.17 | argocd |
+| Secrets Store CSI Driver | 1.5.6 | secrets-store-csi-driver |
+| Vault | 0.32.0 | vault-helm |
+| Vault CSI Provider | 0.32.0（vault chart） | vault-csi-provider |
+| External Secrets Operator | 2.2.0 | eso |
+
+---
+
 ## 執行步驟
 
 ### 1. 部署基礎設施（Terraform）
@@ -102,8 +117,8 @@ terraform apply
 Terraform 模組按照以下順序依序部署：
 
 ```
-minikube start
-  → GitLab（+ socat port forward）
+minikube start（4 CPU、12288 MB RAM，啟用 ingress addon）
+  → GitLab（+ socat port forward 80/443）
   → ArgoCD
   → Secrets Store CSI Driver
   → Vault（dev 模式）
@@ -120,7 +135,17 @@ terraform output argocd_admin_password
 
 ---
 
-### 2. 初始化 Vault
+### 2. 設定 /etc/hosts
+
+Minikube 的 IP 預設為 `192.168.49.2`，需加入域名解析：
+
+```bash
+echo "$(minikube ip) cc-gitlab.onpremiseadvisor.com argocd.onpremiseadvisor.com vault.onpremiseadvisor.com" | sudo tee -a /etc/hosts
+```
+
+---
+
+### 3. 初始化 Vault
 
 進入 Vault UI（`http://vault.onpremiseadvisor.com`）或使用 CLI 設定以下 Secret：
 
@@ -160,7 +185,7 @@ vault write auth/kubernetes/role/nginx-role \
 
 ---
 
-### 3. 部署應用服務
+### 4. 部署應用服務
 
 ```bash
 # 建立 Go Server Image
@@ -176,7 +201,7 @@ helm install task12 . -n default
 
 ---
 
-### 4. 驗證
+### 5. 驗證
 
 ```bash
 # 確認所有 Pod 正常運行
@@ -185,8 +210,8 @@ kubectl get pods
 # 確認 ESO 已同步 Secret
 kubectl get secret vault-k8s-secrets -o yaml
 
-# 測試 Go Server API（需要先 port-forward 或透過 nginx ingress）
-kubectl port-forward svc/go-server-svc 8080:8080
+# 測試 Go Server API（service 名稱為 go-server，對外 port 80）
+kubectl port-forward svc/go-server 8080:80
 curl http://localhost:8080/get
 # 預期回傳：{"code":200,"username":"...","password":"..."}
 ```
@@ -200,6 +225,7 @@ curl http://localhost:8080/get
 - `SecretProviderClass` 定義 Vault 路徑對應
 - Pod 透過 `volumes.csi` 掛載，Secret 以**檔案形式**出現在容器內
 - 適合：設定檔（nginx.conf、redis.conf）
+- Vault 地址：`http://vault.onpremiseadvisor.com`（外部 Ingress）
 
 ```yaml
 volumes:
@@ -213,9 +239,13 @@ volumes:
 ### ESO（環境變數注入）
 
 - `SecretStore` 設定 Vault 連線（token 認證）
-- `ExternalSecret` 定義同步規則，自動在 K8s 內建立 `vault-k8s-secrets` Secret
+  - Vault 地址使用 **K8s 內部 DNS**：`http://vault-helm.vault-helm.svc.cluster.local:8200`
+  - Token 存放於 `vault-root-auth` Secret（與 SecretStore 同檔定義）
+- `ExternalSecret` 定義同步規則（API 版本：`external-secrets.io/v1`），`refreshInterval: 1h`
+- 自動在 K8s 內建立 `vault-k8s-secrets` Secret
 - Pod 透過 `envFrom` 注入，Secret 以**環境變數形式**出現
 - 適合：帳密、API Key 等 K/V 格式憑證
+- **Go Server** 與 **Redis StatefulSet** 皆透過此 Secret 取得連線憑證
 
 ```yaml
 envFrom:
@@ -225,11 +255,35 @@ envFrom:
 
 ---
 
+## 關鍵資源說明
+
+### SecretProviderClass（CSI）
+
+| 欄位 | 值 |
+|------|----|
+| `vaultAddress` | `http://vault.onpremiseadvisor.com` |
+| `roleName` | `nginx-role` |
+| `objects[0]` | `default.conf` ← `secret/data/nginx/default.conf`.config |
+| `objects[1]` | `redis.conf` ← `secret/data/redis/redis.conf`.config |
+
+### ExternalSecret（ESO）
+
+| K8s Secret Key | Vault Path | Property |
+|----------------|------------|----------|
+| `REDIS_HOST` | `redis/userdata` | `REDIS_HOST` |
+| `REDIS_PASSWORD` | `redis/userdata` | `REDIS_PASSWORD` |
+| `REDIS_PORT` | `redis/userdata` | `REDIS_PORT` |
+| `REDIS_USER` | `redis/userdata` | `REDIS_USER` |
+
+---
+
 ## 注意事項
 
 - Vault 目前以 **dev 模式**運行（資料不持久化，重啟後需重新設定 Secret）
-- `helm/templates/cr/vault-secret-store.yaml` 中的 `token: cm9vdA==`（base64 of `root`）僅供 dev 環境測試，**正式環境請替換為短效 Token**
+- `vault-secret-store.yaml` 中同時定義了 `vault-root-auth` K8s Secret，其 `token: cm9vdA==`（base64 of `root`）**僅供 dev 環境測試，正式環境請替換為短效 Token**
+- `go.mod` 的模組名稱為 `task6`（沿用舊版，不影響功能）
 - SSL 憑證 / 私鑰（`ssl/`）不可上傳至版本控制
+- `vault-csi-provider` module 使用同一個 vault chart（v0.32.0），但僅啟用 `csi.enabled=true`，`server.enabled` 與 `injector.enabled` 皆設為 `false`
 
 ---
 
@@ -237,8 +291,8 @@ envFrom:
 
 | 服務 | URL |
 |------|-----|
-| GitLab | `http://gitlab.onpremiseadvisor.com` |
+| GitLab | `http://cc-gitlab.onpremiseadvisor.com` |
 | ArgoCD | `http://argocd.onpremiseadvisor.com` |
 | Vault | `http://vault.onpremiseadvisor.com` |
 
-> 需在 `/etc/hosts` 加入 `$(minikube ip)` 對應的域名解析。
+> 需在 `/etc/hosts` 加入 `$(minikube ip)`（預設 `192.168.49.2`）對應的域名解析。
